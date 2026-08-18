@@ -1,13 +1,146 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, ViewChild } from '@angular/core';
+import { BIGridComponent, BIModulesModule } from 'bi-modules';
+import type { IChangeset } from 'bi-interfaces';
+import { PublicApiClient } from '@salesbuzz/public-sdk';
+
+import { productColumns } from './product-columns';
+import { ProductDataSource } from './product-data-source';
+
+const editableFields = ['Name', 'Price', 'StockQuantity', 'IsActive'];
 
 @Component({
   selector: 'app-root',
-  imports: [],
+  imports: [BIModulesModule],
   template: `
-    <h1>Welcome to {{ title() }}!</h1>
+    <main class="page">
+      <h1>Products</h1>
+
+      <div class="toolbar" aria-label="Product actions">
+        <button type="button" (click)="add()">Add</button>
+        <button type="button" (click)="edit()">Edit</button>
+        <button type="button" (click)="save()">Save</button>
+        <button type="button" (click)="remove()">Delete</button>
+        <button type="button" (click)="cancel()">Cancel</button>
+      </div>
+
+      @if (message) {
+        <p class="message" aria-live="polite">{{ message }}</p>
+      }
+
+      <BI-Grid
+        #grid
+        [DataService]="dataSource"
+        [Columns]="columns"
+        [changeSet]="changeSet"
+        [GridName]="'Products'"
+        [DomID]="'ProductsGrid'"
+        [HasPaging]="true"
+        (RowChange)="onRowChange()"
+        (AfterSave)="onSaved()"
+        (AfterAdd)="onAdded()"
+      ></BI-Grid>
+    </main>
   `,
   styles: [],
 })
 export class App {
-  protected readonly title = signal('frontend');
+  @ViewChild('grid') grid!: BIGridComponent;
+
+  readonly dataSource = new ProductDataSource(inject(PublicApiClient));
+  readonly columns = productColumns.map((column) => ({ ...column, IsEditable: false }));
+  readonly changeSet: IChangeset = { changesetArr: [] };
+
+  message = '';
+  private hasPersistedSelection = false;
+  private changeActive = false;
+
+  add(): void {
+    if (this.changeActive) {
+      this.message = 'Finish the current change first.';
+      return;
+    }
+
+    this.changeActive = true;
+    this.setEditable(true);
+    this.grid.AddRow();
+    this.message = 'Adding product.';
+  }
+
+  edit(): void {
+    if (!this.hasPersistedSelection) {
+      this.message = 'Select a saved product first.';
+      return;
+    }
+
+    if (this.changeActive) {
+      this.message = 'Finish the current change first.';
+      return;
+    }
+
+    this.changeActive = true;
+    this.setEditable(true);
+    this.message = 'Editing product.';
+  }
+
+  save(): void {
+    if (!this.changeActive) {
+      this.message = 'Nothing to save.';
+      return;
+    }
+
+    this.grid.Save();
+    this.message = 'Saving product.';
+  }
+
+  remove(): void {
+    if (!this.hasPersistedSelection) {
+      this.message = 'Select a saved product first.';
+      return;
+    }
+
+    if (!window.confirm('Delete this product?')) {
+      return;
+    }
+
+    this.grid.DeleteRow();
+    this.message = 'Deleting product.';
+  }
+
+  cancel(): void {
+    if (!this.changeActive) {
+      this.message = 'Nothing to cancel.';
+      return;
+    }
+
+    this.grid.Cancel();
+    this.changeActive = false;
+    this.setEditable(false);
+    this.message = 'Changes cancelled.';
+  }
+
+  onRowChange(): void {
+    const selectedRow = this.grid.GetRowValue();
+    this.hasPersistedSelection = selectedRow?.[this.dataSource.Key] !== null
+      && selectedRow?.[this.dataSource.Key] !== undefined;
+
+    if (!this.changeActive) {
+      this.setEditable(false);
+    }
+  }
+
+  onSaved(): void {
+    this.changeActive = false;
+    this.setEditable(false);
+    this.message = 'Changes saved.';
+  }
+
+  onAdded(): void {
+    this.changeActive = false;
+    this.setEditable(false);
+    this.message = 'Product added.';
+  }
+
+  private setEditable(editable: boolean): void {
+    this.grid.EnableDisable_columns(editableFields, editable);
+  }
 }

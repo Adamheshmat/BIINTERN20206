@@ -49,9 +49,21 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "kendo-font-icons.ttf",
+                "input": "node_modules/bi-modules/assets",
+                "output": "assets"
+              },
+              {
+                "glob": "mat-icons.woff2",
+                "input": "node_modules/bi-modules/assets",
+                "output": "assets"
               }
             ],
             "styles": [
+              "node_modules/@progress/kendo-theme-default/dist/all.css",
+              "node_modules/bi-modules/styles/bi-theme.css",
               "src/styles.css"
             ]
           },
