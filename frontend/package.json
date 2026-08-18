@@ -41,6 +41,9 @@
     "zone.js": "~0.15.0"
   },
   "overrides": {
+    "@angular/animations": "$@angular/animations",
+    "@angular/common": "$@angular/common",
+    "@angular/core": "$@angular/core",
     "@salesbuzz/public-sdk": {
       "bi-interfaces": "$bi-interfaces",
       "bi-modules": "$bi-modules"
