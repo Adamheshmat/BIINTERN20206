@@ -1,5 +1,4 @@
-import { Component, DestroyRef, inject, ViewChild } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Component, inject, ViewChild } from '@angular/core';
 import { BIGridComponent, BIModulesModule } from 'bi-modules';
 import type { IChangeset } from 'bi-interfaces';
 import { PublicApiClient } from '@salesbuzz/public-sdk';
@@ -47,7 +46,6 @@ const editableFields = ['Name', 'Price', 'StockQuantity', 'IsActive'];
 export class App {
   @ViewChild('grid') grid!: BIGridComponent;
 
-  private readonly destroyRef = inject(DestroyRef);
   readonly dataSource = new ProductDataSource(inject(PublicApiClient));
   readonly columns = productColumns.map((column) => ({ ...column, IsEditable: false }));
   readonly changeSet: IChangeset = { changesetArr: [] };
@@ -55,17 +53,6 @@ export class App {
   message = '';
   private hasPersistedSelection = false;
   private changeActive = false;
-  private deletePending = false;
-
-  constructor() {
-    this.dataSource.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
-      if (this.deletePending) {
-        this.deletePending = false;
-        this.hasPersistedSelection = false;
-        this.message = 'Product deleted.';
-      }
-    });
-  }
 
   add(): void {
     if (this.changeActive) {
@@ -129,7 +116,7 @@ export class App {
       return;
     }
 
-    this.deletePending = true;
+    this.hasPersistedSelection = false;
     this.grid.DeleteRow();
     this.message = 'Deleting product.';
   }

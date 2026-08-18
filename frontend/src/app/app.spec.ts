@@ -151,7 +151,7 @@ describe('App', () => {
     expect(page.message).toBe('Finish the current change first.');
   });
 
-  it('keeps a newly added persisted row selected and clears selection after its delete refresh', () => {
+  it('keeps a newly added persisted row selected', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
 
@@ -165,13 +165,30 @@ describe('App', () => {
     page.onAdded();
     buttons[1].click();
     expect(grid.calls.at(-1)).toBe(`EnableDisable_columns:${editableFields.join(',')}:true`);
+  });
 
-    page.onSaved();
+  it('clears cached selection when a confirmed delete command starts and ignores later data reads', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    const page = fixture.componentInstance;
+    const grid = fixture.debugElement.query(By.directive(BIGridComponent))
+      .componentInstance as BIGridComponent;
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal('confirm', confirm);
+
+    grid.rowValue = { Id: 12 };
+    page.onRowChange();
     buttons[3].click();
+    expect(confirm).toHaveBeenCalledWith('Delete this product?');
     expect(grid.calls.at(-1)).toBe('DeleteRow');
+    expect(page.message).toBe('Deleting product.');
+
+    buttons[1].click();
+    expect(page.message).toBe('Select a saved product first.');
 
     page.dataSource.next({ data: [], total: 0 });
-    buttons[1].click();
     expect(page.message).toBe('Select a saved product first.');
   });
 
