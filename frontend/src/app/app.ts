@@ -1,4 +1,5 @@
-import { Component, inject, ViewChild } from '@angular/core';
+import { Component, DestroyRef, inject, ViewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { BIGridComponent, BIModulesModule } from 'bi-modules';
 import type { IChangeset } from 'bi-interfaces';
 import { PublicApiClient } from '@salesbuzz/public-sdk';
@@ -46,6 +47,7 @@ const editableFields = ['Name', 'Price', 'StockQuantity', 'IsActive'];
 export class App {
   @ViewChild('grid') grid!: BIGridComponent;
 
+  private readonly destroyRef = inject(DestroyRef);
   readonly dataSource = new ProductDataSource(inject(PublicApiClient));
   readonly columns = productColumns.map((column) => ({ ...column, IsEditable: false }));
   readonly changeSet: IChangeset = { changesetArr: [] };
@@ -53,6 +55,17 @@ export class App {
   message = '';
   private hasPersistedSelection = false;
   private changeActive = false;
+  private deletePending = false;
+
+  constructor() {
+    this.dataSource.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      if (this.deletePending) {
+        this.deletePending = false;
+        this.hasPersistedSelection = false;
+        this.message = 'Product deleted.';
+      }
+    });
+  }
 
   add(): void {
     if (this.changeActive) {
@@ -61,8 +74,8 @@ export class App {
     }
 
     this.changeActive = true;
-    this.setEditable(true);
     this.grid.AddRow();
+    this.setEditable(true);
     this.message = 'Adding product.';
   }
 
@@ -88,11 +101,25 @@ export class App {
       return;
     }
 
+    const hasPendingChanges = this.grid.IsDirty(this.grid.formGroups);
     this.grid.Save();
+
+    if (!hasPendingChanges) {
+      this.changeActive = false;
+      this.setEditable(false);
+      this.message = 'No changes to save.';
+      return;
+    }
+
     this.message = 'Saving product.';
   }
 
   remove(): void {
+    if (this.changeActive) {
+      this.message = 'Finish the current change first.';
+      return;
+    }
+
     if (!this.hasPersistedSelection) {
       this.message = 'Select a saved product first.';
       return;
@@ -102,6 +129,7 @@ export class App {
       return;
     }
 
+    this.deletePending = true;
     this.grid.DeleteRow();
     this.message = 'Deleting product.';
   }
@@ -119,9 +147,7 @@ export class App {
   }
 
   onRowChange(): void {
-    const selectedRow = this.grid.GetRowValue();
-    this.hasPersistedSelection = selectedRow?.[this.dataSource.Key] !== null
-      && selectedRow?.[this.dataSource.Key] !== undefined;
+    this.refreshPersistedSelection();
 
     if (!this.changeActive) {
       this.setEditable(false);
@@ -136,11 +162,18 @@ export class App {
 
   onAdded(): void {
     this.changeActive = false;
+    this.refreshPersistedSelection();
     this.setEditable(false);
     this.message = 'Product added.';
   }
 
   private setEditable(editable: boolean): void {
     this.grid.EnableDisable_columns(editableFields, editable);
+  }
+
+  private refreshPersistedSelection(): void {
+    const selectedRow = this.grid.GetRowValue();
+    this.hasPersistedSelection = selectedRow?.[this.dataSource.Key] !== null
+      && selectedRow?.[this.dataSource.Key] !== undefined;
   }
 }

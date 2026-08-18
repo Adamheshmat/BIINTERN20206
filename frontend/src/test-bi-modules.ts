@@ -19,13 +19,19 @@ export class BIGridComponent {
 
   readonly calls: string[] = [];
   rowValue: Record<string, unknown> = {};
+  currentRowEditable = false;
+  hasPendingChanges = false;
+  formGroups: unknown[] = [];
 
   AddRow(): void {
     this.calls.push('AddRow');
+    this.currentRowEditable = false;
+    this.hasPendingChanges = true;
   }
 
   EnableDisable_columns(columns: string[], editable: boolean): void {
     this.calls.push(`EnableDisable_columns:${columns.join(',')}:${editable}`);
+    this.currentRowEditable = editable;
   }
 
   Save(): void {
@@ -42,6 +48,10 @@ export class BIGridComponent {
 
   GetRowValue(): Record<string, unknown> {
     return this.rowValue;
+  }
+
+  IsDirty(_formGroups: unknown[]): boolean {
+    return this.hasPendingChanges;
   }
 }
 
