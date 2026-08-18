@@ -1,4 +1,4 @@
-import { Component, inject, ViewChild } from '@angular/core';
+import { Component, inject, OnInit, ViewChild } from '@angular/core';
 import { BIGridComponent, BIModulesModule } from 'bi-modules';
 import type { IChangeset } from 'bi-interfaces';
 import { PublicApiClient } from '@salesbuzz/public-sdk';
@@ -23,8 +23,8 @@ const editableFields = ['Name', 'Price', 'StockQuantity', 'IsActive'];
         <button type="button" (click)="cancel()">Cancel</button>
       </div>
 
-      @if (message) {
-        <p class="message" aria-live="polite">{{ message }}</p>
+      @if (dataSource.errorMessage() || message) {
+        <p class="message" aria-live="polite">{{ dataSource.errorMessage() || message }}</p>
       }
 
       <BI-Grid
@@ -43,7 +43,7 @@ const editableFields = ['Name', 'Price', 'StockQuantity', 'IsActive'];
   `,
   styles: [],
 })
-export class App {
+export class App implements OnInit {
   @ViewChild('grid') grid!: BIGridComponent;
 
   readonly dataSource = new ProductDataSource(inject(PublicApiClient));
@@ -53,6 +53,10 @@ export class App {
   message = '';
   private hasPersistedSelection = false;
   private changeActive = false;
+
+  ngOnInit(): void {
+    this.dataSource.read('$skip=0&$top=10&$count=true');
+  }
 
   add(): void {
     if (this.changeActive) {

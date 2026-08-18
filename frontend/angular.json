@@ -105,6 +105,18 @@
         },
         "extract-i18n": {
           "builder": "@angular/build:extract-i18n"
+        },
+        "test-real-grid": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "buildTarget": "frontend:build:development",
+            "tsConfig": "tsconfig.real-grid.spec.json",
+            "runner": "vitest",
+            "include": [
+              "src/app/app.real-grid.spec.ts"
+            ],
+            "watch": false
+          }
         }
       }
     }

@@ -1,6 +1,6 @@
 import { DataTypes } from 'bi-interfaces';
 import type { PublicApiClient } from '@salesbuzz/public-sdk';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Product } from './product.model';
@@ -79,6 +79,19 @@ describe('ProductDataSource', () => {
     expect(client.get).toHaveBeenCalledWith(url);
   });
 
+  it('reports a failed entity refresh while preserving the original error', () => {
+    const client = createClient();
+    const failure = new Error('refresh failed');
+    vi.mocked(client.get).mockReturnValueOnce(throwError(() => failure));
+    const source = new ProductDataSource(client);
+    let received: unknown;
+
+    source.get('/Products?$filter=Id eq 3').subscribe({ error: (error) => (received = error) });
+
+    expect(received).toBe(failure);
+    expect(source.errorMessage()).toBe('Unable to load products. Please try again.');
+  });
+
   it('defines the five BI Grid columns for the PascalCase product fields', () => {
     const source = new ProductDataSource(createClient());
 
@@ -96,6 +109,20 @@ describe('ProductDataSource', () => {
       DataTypes.NUMERIC,
       DataTypes.Boolean,
     ]);
+    expect(source.Columns.map((column) => column.controlType)).toEqual([
+      'numeric',
+      'text',
+      'numeric',
+      'numeric',
+      'boolean',
+    ]);
+    expect(source.Columns.map((column) => column.DisplayName)).toEqual([
+      'Id',
+      'Product Name',
+      'Price',
+      'Stock Quantity',
+      'Active',
+    ]);
     expect(source.Columns[0].IsEditable).toBe(false);
     expect(source.Columns[4].DefaultValue).toBe(true);
 
@@ -107,5 +134,37 @@ describe('ProductDataSource', () => {
     expect(priceValidators[0]({ value: null } as never)).toEqual({ required: true });
     expect(priceValidators[1]({ value: -1 } as never)).toEqual({ min: { min: 0, actual: -1 } });
     expect(stockValidators[1]({ value: -1 } as never)).toEqual({ min: { min: 0, actual: -1 } });
+  });
+
+  it('reports a read failure without ending the data stream so a later read can retry', () => {
+    const client = createClient();
+    vi.mocked(client.get)
+      .mockReturnValueOnce(throwError(() => new Error('offline')))
+      .mockReturnValueOnce(of({ value: [product], '@odata.count': 1 }));
+    const source = new ProductDataSource(client);
+
+    source.read('$skip=0&$top=10&$count=true');
+    expect(source.errorMessage()).toBe('Unable to load products. Please try again.');
+
+    source.read('$skip=0&$top=10&$count=true');
+    expect(source.errorMessage()).toBe('');
+    expect(source.getValue()).toEqual({ data: [product], total: 1 });
+  });
+
+  it.each([
+    ['add', (source: ProductDataSource) => source.add(product), 'post'],
+    ['patch', (source: ProductDataSource) => source.patch({ Price: 13 }, 3), 'patch'],
+    ['delete', (source: ProductDataSource) => source.delete(3), 'delete'],
+  ] as const)('reports a failed %s mutation while preserving the original error', (_, mutate, method) => {
+    const client = createClient();
+    const failure = new Error('write failed');
+    vi.mocked(client[method]).mockReturnValueOnce(throwError(() => failure));
+    const source = new ProductDataSource(client);
+    let received: unknown;
+
+    mutate(source).subscribe({ error: (error) => (received = error) });
+
+    expect(received).toBe(failure);
+    expect(source.errorMessage()).toBe('Unable to save product. Please try again.');
   });
 });

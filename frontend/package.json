@@ -6,6 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "test": "vitest run",
+    "test:real-grid": "ng run frontend:test-real-grid",
     "watch": "ng build --watch --configuration development"
   },
   "prettier": {
@@ -29,6 +30,7 @@
     "@angular/core": "20.2.2",
     "@angular/forms": "20.2.2",
     "@angular/material": "20.2.2",
+    "@angular/material-moment-adapter": "20.2.2",
     "@angular/platform-browser": "20.2.2",
     "@angular/router": "20.2.2",
     "@ngx-translate/core": "^15.0.0",
@@ -44,6 +46,7 @@
     "@angular/animations": "$@angular/animations",
     "@angular/common": "$@angular/common",
     "@angular/core": "$@angular/core",
+    "@angular/material-moment-adapter": "$@angular/material-moment-adapter",
     "@salesbuzz/public-sdk": {
       "bi-interfaces": "$bi-interfaces",
       "bi-modules": "$bi-modules"

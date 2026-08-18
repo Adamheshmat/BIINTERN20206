@@ -24,8 +24,20 @@ public sealed class ProductsController(ProductDbContext db) : ODataController
         return Created(product);
     }
 
-    public async Task<IActionResult> Patch([FromODataUri] int key, [FromBody] Delta<Product> delta)
+    public async Task<IActionResult> Patch([FromODataUri] int key, [FromBody] Delta<Product>? delta)
     {
+        if (delta is null || !ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        if (delta.GetChangedPropertyNames().Any(property =>
+                string.Equals(property, nameof(Product.Id), StringComparison.OrdinalIgnoreCase)))
+        {
+            ModelState.AddModelError(nameof(Product.Id), "The product key cannot be changed.");
+            return BadRequest(ModelState);
+        }
+
         var product = await db.Products.FindAsync(key);
         if (product is null)
         {

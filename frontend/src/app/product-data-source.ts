@@ -1,7 +1,8 @@
 import type { IDataSource } from 'bi-interfaces';
 import type { PublicApiClient } from '@salesbuzz/public-sdk';
 import type { DataResult } from '@progress/kendo-data-query';
-import { BehaviorSubject, Observable, throwError } from 'rxjs';
+import { signal } from '@angular/core';
+import { BehaviorSubject, catchError, Observable, throwError } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { productColumns } from './product-columns';
@@ -15,6 +16,8 @@ interface ODataResponse<T> {
 type GridDataResult = DataResult;
 
 export class ProductDataSource extends BehaviorSubject<GridDataResult> implements IDataSource {
+  readonly errorMessage = signal('');
+
   Key = 'Id';
   Key2 = '';
   Key3 = '';
@@ -42,18 +45,22 @@ export class ProductDataSource extends BehaviorSubject<GridDataResult> implement
   }
 
   read(filter: string): void {
+    this.errorMessage.set('');
     this.loading = true;
     this.client
       .get<ODataResponse<Product>>(this.formatAPIURLWithFilter(filter))
       .pipe(finalize(() => (this.loading = false)))
-      .subscribe((response) => {
-        this.data = response.value;
-        this.next({ data: response.value, total: response['@odata.count'] });
+      .subscribe({
+        next: (response) => {
+          this.data = response.value;
+          this.next({ data: response.value, total: response['@odata.count'] });
+        },
+        error: () => this.errorMessage.set('Unable to load products. Please try again.'),
       });
   }
 
   add(data: Product): Observable<Product> {
-    return this.client.post<Product>(this.POSTAPIURL!, data);
+    return this.reportWriteFailure(this.client.post<Product>(this.POSTAPIURL!, data));
   }
 
   edit(data: Partial<Product>, id: number | string): Observable<Product> {
@@ -61,11 +68,13 @@ export class ProductDataSource extends BehaviorSubject<GridDataResult> implement
   }
 
   patch(data: Partial<Product>, id: number | string): Observable<Product> {
-    return this.client.patch<Product>(`${this.PUTAPIURL}(${id})`, data);
+    return this.reportWriteFailure(
+      this.client.patch<Product>(`${this.PUTAPIURL}(${id})`, data),
+    );
   }
 
   delete(id: number | string): Observable<unknown> {
-    return this.client.delete(this.entityUrl(id));
+    return this.reportWriteFailure(this.client.delete(this.entityUrl(id)));
   }
 
   batch(
@@ -77,7 +86,13 @@ export class ProductDataSource extends BehaviorSubject<GridDataResult> implement
   }
 
   get<T>(url: string): Observable<T> {
-    return this.client.get<T>(url);
+    this.errorMessage.set('');
+    return this.client.get<T>(url).pipe(
+      catchError((error: unknown) => {
+        this.errorMessage.set('Unable to load products. Please try again.');
+        return throwError(() => error);
+      }),
+    );
   }
 
   formatAPIURLWithFilter(filter: string): string {
@@ -90,5 +105,15 @@ export class ProductDataSource extends BehaviorSubject<GridDataResult> implement
 
   private entityUrl(id: number | string): string {
     return `${this.DELETEAPIURL}(${id})`;
+  }
+
+  private reportWriteFailure<T>(request: Observable<T>): Observable<T> {
+    this.errorMessage.set('');
+    return request.pipe(
+      catchError((error: unknown) => {
+        this.errorMessage.set('Unable to save product. Please try again.');
+        return throwError(() => error);
+      }),
+    );
   }
 }

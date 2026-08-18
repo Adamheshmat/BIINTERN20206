@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/real-grid-spec",
+    "types": [
+      "vitest/globals"
+    ]
+  },
+  "include": [
+    "src/app/app.real-grid.spec.ts"
+  ]
+}

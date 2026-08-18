@@ -1,6 +1,9 @@
 import { Validators } from '@angular/forms';
-import { DataTypes, IColumns } from 'bi-interfaces';
+import { ControlTypes, DataTypes, IColumns } from 'bi-interfaces';
 import type { IDataSource } from 'bi-interfaces';
+
+const numericControl = 'numeric' as ControlTypes;
+const booleanControl = 'boolean' as ControlTypes;
 
 export const productColumns: Array<IColumns & IDataSource['Columns'][number]> = [
   {
@@ -8,6 +11,7 @@ export const productColumns: Array<IColumns & IDataSource['Columns'][number]> = 
     Name: 'Id',
     DisplayName: 'Id',
     DataType: DataTypes.NUMERIC,
+    controlType: numericControl,
     IsEditable: false,
     IsFilterable: true,
     IsVisible: true,
@@ -15,8 +19,9 @@ export const productColumns: Array<IColumns & IDataSource['Columns'][number]> = 
   {
     DomID: '',
     Name: 'Name',
-    DisplayName: 'Name',
+    DisplayName: 'Product Name',
     DataType: DataTypes.Text,
+    controlType: ControlTypes.Text,
     IsEditable: true,
     IsFilterable: true,
     IsVisible: true,
@@ -27,6 +32,7 @@ export const productColumns: Array<IColumns & IDataSource['Columns'][number]> = 
     Name: 'Price',
     DisplayName: 'Price',
     DataType: DataTypes.NUMERIC,
+    controlType: numericControl,
     IsEditable: true,
     IsFilterable: true,
     IsVisible: true,
@@ -37,6 +43,7 @@ export const productColumns: Array<IColumns & IDataSource['Columns'][number]> = 
     Name: 'StockQuantity',
     DisplayName: 'Stock Quantity',
     DataType: DataTypes.NUMERIC,
+    controlType: numericControl,
     IsEditable: true,
     IsFilterable: true,
     IsVisible: true,
@@ -45,8 +52,9 @@ export const productColumns: Array<IColumns & IDataSource['Columns'][number]> = 
   {
     DomID: '',
     Name: 'IsActive',
-    DisplayName: 'Is Active',
+    DisplayName: 'Active',
     DataType: DataTypes.Boolean,
+    controlType: booleanControl,
     IsEditable: true,
     IsFilterable: true,
     IsVisible: true,
