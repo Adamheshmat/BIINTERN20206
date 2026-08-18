@@ -1,0 +1,57 @@
+{
+  "name": "frontend",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "test": "vitest run",
+    "watch": "ng build --watch --configuration development"
+  },
+  "prettier": {
+    "printWidth": 100,
+    "singleQuote": true,
+    "overrides": [
+      {
+        "files": "*.html",
+        "options": {
+          "parser": "angular"
+        }
+      }
+    ]
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/animations": "20.2.2",
+    "@angular/common": "20.2.2",
+    "@angular/cdk": "20.2.2",
+    "@angular/compiler": "20.2.2",
+    "@angular/core": "20.2.2",
+    "@angular/forms": "20.2.2",
+    "@angular/material": "20.2.2",
+    "@angular/platform-browser": "20.2.2",
+    "@angular/router": "20.2.2",
+    "@ngx-translate/core": "^15.0.0",
+    "@progress/kendo-angular-l10n": "^20.0.3",
+    "@salesbuzz/public-sdk": "file:../../Packages/npm/salesbuzz-public-sdk-1.0.2.tgz",
+    "bi-interfaces": "file:../../Packages/npm/bi-interfaces-0.0.1.tgz",
+    "bi-modules": "file:../../Packages/npm/bi-modules-0.0.5.tgz",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "zone.js": "~0.15.0"
+  },
+  "overrides": {
+    "@salesbuzz/public-sdk": {
+      "bi-interfaces": "$bi-interfaces",
+      "bi-modules": "$bi-modules"
+    }
+  },
+  "devDependencies": {
+    "@angular/build": "20.2.2",
+    "@angular/cli": "20.2.2",
+    "@angular/compiler-cli": "20.2.2",
+    "jsdom": "^26.1.0",
+    "typescript": "~5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
