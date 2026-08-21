@@ -5,7 +5,7 @@
 - .NET 10 SDK
 - A Node.js version supported by Angular 20 and npm
 - The supplied BI package archives in `../Packages/npm` and `../Packages/nuget`
-- Access to SQL Server with a database named `SdkProductCrud`
+- Docker Desktop for the included local SQL Server, or access to the company SQL Server
 
 If frontend dependencies are missing, install them once:
 
