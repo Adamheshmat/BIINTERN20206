@@ -6,6 +6,24 @@ repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 api_pid=""
 web_pid=""
 
+if [[ -z "${ConnectionStrings__DefaultConnection:-}" ]]; then
+  if [[ ! -f "$repo_dir/.env" ]]; then
+    echo "Missing $repo_dir/.env. Copy .env.example to .env, set MSSQL_SA_PASSWORD, and initialize SQL Server." >&2
+    exit 1
+  fi
+
+  set -a
+  # shellcheck disable=SC1091
+  source "$repo_dir/.env"
+  set +a
+
+  : "${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}"
+  MSSQL_HOST="${MSSQL_HOST:-localhost}"
+  MSSQL_PORT="${MSSQL_PORT:-1433}"
+  connection_password="${MSSQL_SA_PASSWORD//\"/\"\"}"
+  export ConnectionStrings__DefaultConnection="Server=$MSSQL_HOST,$MSSQL_PORT;Database=SdkProductCrud;User Id=sa;Password=\"$connection_password\";Encrypt=True;TrustServerCertificate=True"
+fi
+
 cleanup() {
   trap - EXIT INT TERM
 

@@ -13,8 +13,7 @@ IEdmModel edmModel = modelBuilder.GetEdmModel();
 
 builder.Services.AddSalesBuzzOData(edmModel);
 builder.Services.AddSalesBuzzExceptionHandling();
-builder.Services.AddDbContext<ProductDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("Products") ?? "Data Source=products.db"));
+builder.Services.AddCatalogData(builder.Configuration);
 builder.Services.AddCors(options => options.AddPolicy("LocalAngular", policy =>
     policy.WithOrigins("http://localhost:4200").AllowAnyHeader().AllowAnyMethod()));
 
@@ -25,8 +24,7 @@ app.UseCors("LocalAngular");
 
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<ProductDbContext>();
-    await db.Database.EnsureCreatedAsync();
+    var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
 
     if (!await db.Products.AnyAsync())
     {

@@ -11,156 +11,190 @@ namespace SdkProductCrud.Api.Tests;
 
 public sealed class ProductApiTests
 {
-    [Fact]
+    [SqlServerFact]
     public async Task Products_support_read_create_patch_and_delete()
     {
-        using var factory = new ProductApiFactory();
-        using var client = factory.CreateClient();
-
-        var initial = await client.GetFromJsonAsync<JsonElement>("/Products?$count=true");
-        Assert.Equal(3, initial.GetProperty("@odata.count").GetInt32());
-
-        var create = await client.PostAsJsonAsync("/Products", new
+        await WithSqlServerApiAsync(async client =>
         {
-            Name = "Test Product",
-            Price = 12.50m,
-            StockQuantity = 8,
-            IsActive = true
+            var initial = await client.GetFromJsonAsync<JsonElement>("/Products?$count=true");
+            Assert.Equal(3, initial.GetProperty("@odata.count").GetInt32());
+
+            var create = await client.PostAsJsonAsync("/Products", new
+            {
+                Name = "Test Product",
+                Price = 12.50m,
+                StockQuantity = 8,
+                IsActive = true
+            });
+            Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+
+            var product = await create.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.True(product.TryGetProperty("Id", out var identifier));
+            Assert.Equal("Test Product", product.GetProperty("Name").GetString());
+            var id = identifier.GetInt32();
+
+            using var patch = new HttpRequestMessage(HttpMethod.Patch, $"/Products({id})")
+            {
+                Content = JsonContent.Create(new { Price = 15.00m })
+            };
+            Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(patch)).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/Products({id})")).StatusCode);
         });
-        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
-
-        var product = await create.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.True(product.TryGetProperty("Id", out var identifier));
-        Assert.Equal("Test Product", product.GetProperty("Name").GetString());
-        var id = identifier.GetInt32();
-
-        using var patch = new HttpRequestMessage(HttpMethod.Patch, $"/Products({id})")
-        {
-            Content = JsonContent.Create(new { Price = 15.00m })
-        };
-        Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(patch)).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/Products({id})")).StatusCode);
     }
 
-    [Fact]
+    [SqlServerFact]
+    public async Task Startup_does_not_add_sample_products_when_the_table_is_not_empty()
+    {
+        await using var database = await SqlServerTestDatabase.CreateInitializedAsync();
+        await using (var connection = await database.OpenConnectionAsync())
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                INSERT INTO dbo.Products (Name, Price, StockQuantity, IsActive)
+                VALUES (N'Existing product', 9.99, 7, 1);
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        using var factory = new ProductApiFactory(database.ConnectionString);
+        using var client = factory.CreateClient();
+        var payload = await client.GetFromJsonAsync<JsonElement>("/Products?$count=true");
+
+        Assert.Equal(1, payload.GetProperty("@odata.count").GetInt32());
+        Assert.Equal(
+            "Existing product",
+            payload.GetProperty("value")[0].GetProperty("Name").GetString());
+    }
+
+    [SqlServerFact]
     public async Task Products_reject_blank_names_and_negative_values()
     {
-        using var factory = new ProductApiFactory();
-        using var client = factory.CreateClient();
-
-        var blankName = await client.PostAsJsonAsync("/Products", new
+        await WithSqlServerApiAsync(async client =>
         {
-            Name = "",
-            Price = 12.50m,
-            StockQuantity = 8,
-            IsActive = true
-        });
-        Assert.Equal(HttpStatusCode.BadRequest, blankName.StatusCode);
+            var blankName = await client.PostAsJsonAsync("/Products", new
+            {
+                Name = "",
+                Price = 12.50m,
+                StockQuantity = 8,
+                IsActive = true
+            });
+            Assert.Equal(HttpStatusCode.BadRequest, blankName.StatusCode);
 
-        var negativeValues = await client.PostAsJsonAsync("/Products", new
+            var negativeValues = await client.PostAsJsonAsync("/Products", new
+            {
+                Name = "Invalid Product",
+                Price = -0.01m,
+                StockQuantity = -1,
+                IsActive = true
+            });
+            Assert.Equal(HttpStatusCode.BadRequest, negativeValues.StatusCode);
+        });
+    }
+
+    [SqlServerFact]
+    public async Task Products_order_by_price_on_SQL_Server()
+    {
+        await WithSqlServerApiAsync(async client =>
         {
-            Name = "Invalid Product",
-            Price = -0.01m,
-            StockQuantity = -1,
-            IsActive = true
+            var response = await client.GetAsync("/Products?$orderby=Price%20desc");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal(
+                ["Coffee", "Juice", "Tea"],
+                payload.GetProperty("value").EnumerateArray()
+                    .Select(item => item.GetProperty("Name").GetString()!)
+                    .ToArray());
         });
-        Assert.Equal(HttpStatusCode.BadRequest, negativeValues.StatusCode);
     }
 
-    [Fact]
-    public async Task Products_order_by_price_on_sqlite()
+    [SqlServerFact]
+    public async Task Products_filter_by_price_range_on_SQL_Server()
     {
-        using var factory = new ProductApiFactory();
-        using var client = factory.CreateClient();
+        await WithSqlServerApiAsync(async client =>
+        {
+            var response = await client.GetAsync(
+                "/Products?$filter=Price%20ge%204%20and%20Price%20lt%205&$orderby=Price");
 
-        var response = await client.GetAsync("/Products?$orderby=Price%20desc");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal(
-            ["Coffee", "Juice", "Tea"],
-            payload.GetProperty("value").EnumerateArray()
-                .Select(item => item.GetProperty("Name").GetString()!)
-                .ToArray());
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+            var products = payload.GetProperty("value").EnumerateArray().ToArray();
+            Assert.Single(products);
+            Assert.Equal("Juice", products[0].GetProperty("Name").GetString());
+            Assert.Equal(4.75m, products[0].GetProperty("Price").GetDecimal());
+        });
     }
 
-    [Fact]
-    public async Task Products_filter_by_price_range_on_sqlite()
-    {
-        using var factory = new ProductApiFactory();
-        using var client = factory.CreateClient();
-
-        var response = await client.GetAsync(
-            "/Products?$filter=Price%20ge%204%20and%20Price%20lt%205&$orderby=Price");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var products = payload.GetProperty("value").EnumerateArray().ToArray();
-        Assert.Single(products);
-        Assert.Equal("Juice", products[0].GetProperty("Name").GetString());
-        Assert.Equal(4.75m, products[0].GetProperty("Price").GetDecimal());
-    }
-
-    [Fact]
+    [SqlServerFact]
     public async Task Products_reject_null_and_malformed_patch_bodies()
     {
-        using var factory = new ProductApiFactory();
-        using var client = factory.CreateClient();
-        var id = await CreateProductAsync(client);
-
-        using var nullPatch = new HttpRequestMessage(HttpMethod.Patch, $"/Products({id})")
+        await WithSqlServerApiAsync(async client =>
         {
-            Content = new StringContent("null", Encoding.UTF8, "application/json")
-        };
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.SendAsync(nullPatch)).StatusCode);
+            var id = await CreateProductAsync(client);
 
-        using var malformedPatch = new HttpRequestMessage(HttpMethod.Patch, $"/Products({id})")
-        {
-            Content = JsonContent.Create(new { Price = "not-a-decimal" })
-        };
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.SendAsync(malformedPatch)).StatusCode);
+            using var nullPatch = new HttpRequestMessage(HttpMethod.Patch, $"/Products({id})")
+            {
+                Content = new StringContent("null", Encoding.UTF8, "application/json")
+            };
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.SendAsync(nullPatch)).StatusCode);
+
+            using var malformedPatch = new HttpRequestMessage(HttpMethod.Patch, $"/Products({id})")
+            {
+                Content = JsonContent.Create(new { Price = "not-a-decimal" })
+            };
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.SendAsync(malformedPatch)).StatusCode);
+        });
     }
 
-    [Fact]
+    [SqlServerFact]
     public async Task Products_reject_any_patch_attempt_to_set_the_key()
     {
-        using var factory = new ProductApiFactory();
-        using var client = factory.CreateClient();
-        var id = await CreateProductAsync(client);
-
-        using var patch = new HttpRequestMessage(HttpMethod.Patch, $"/Products({id})")
+        await WithSqlServerApiAsync(async client =>
         {
-            Content = JsonContent.Create(new { Id = id, Name = "Changed" })
-        };
+            var id = await CreateProductAsync(client);
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.SendAsync(patch)).StatusCode);
-        var persisted = await client.GetFromJsonAsync<JsonElement>($"/Products?$filter=Id%20eq%20{id}");
-        Assert.Equal(
-            "Patch target",
-            persisted.GetProperty("value")[0].GetProperty("Name").GetString());
+            using var patch = new HttpRequestMessage(HttpMethod.Patch, $"/Products({id})")
+            {
+                Content = JsonContent.Create(new { Id = id, Name = "Changed" })
+            };
+
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.SendAsync(patch)).StatusCode);
+            var persisted = await client.GetFromJsonAsync<JsonElement>($"/Products?$filter=Id%20eq%20{id}");
+            Assert.Equal(
+                "Patch target",
+                persisted.GetProperty("value")[0].GetProperty("Name").GetString());
+        });
     }
 
-    [Fact]
+    [SqlServerFact]
     public async Task Products_reject_posts_with_omitted_price_or_stock_quantity()
     {
-        using var factory = new ProductApiFactory();
+        await WithSqlServerApiAsync(async client =>
+        {
+            var missingPrice = await client.PostAsJsonAsync("/Products", new
+            {
+                Name = "Missing price",
+                StockQuantity = 8,
+                IsActive = true
+            });
+            Assert.Equal(HttpStatusCode.BadRequest, missingPrice.StatusCode);
+
+            var missingStock = await client.PostAsJsonAsync("/Products", new
+            {
+                Name = "Missing stock",
+                Price = 12.50m,
+                IsActive = true
+            });
+            Assert.Equal(HttpStatusCode.BadRequest, missingStock.StatusCode);
+        });
+    }
+
+    private static async Task WithSqlServerApiAsync(Func<HttpClient, Task> test)
+    {
+        await using var database = await SqlServerTestDatabase.CreateInitializedAsync();
+        using var factory = new ProductApiFactory(database.ConnectionString);
         using var client = factory.CreateClient();
-
-        var missingPrice = await client.PostAsJsonAsync("/Products", new
-        {
-            Name = "Missing price",
-            StockQuantity = 8,
-            IsActive = true
-        });
-        Assert.Equal(HttpStatusCode.BadRequest, missingPrice.StatusCode);
-
-        var missingStock = await client.PostAsJsonAsync("/Products", new
-        {
-            Name = "Missing stock",
-            Price = 12.50m,
-            IsActive = true
-        });
-        Assert.Equal(HttpStatusCode.BadRequest, missingStock.StatusCode);
+        await test(client);
     }
 
     private static async Task<int> CreateProductAsync(HttpClient client)
@@ -179,9 +213,12 @@ public sealed class ProductApiTests
 
     private sealed class ProductApiFactory : WebApplicationFactory<Program>
     {
-        private readonly string databasePath = Path.Combine(
-            Path.GetTempPath(),
-            $"sdk-product-crud-{Guid.NewGuid():N}.db");
+        private readonly string connectionString;
+
+        internal ProductApiFactory(string connectionString)
+        {
+            this.connectionString = connectionString;
+        }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -189,20 +226,8 @@ public sealed class ProductApiTests
             builder.ConfigureAppConfiguration((_, configuration) =>
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["ConnectionStrings:Products"] = $"Data Source={databasePath}"
+                    ["ConnectionStrings:DefaultConnection"] = connectionString
                 }));
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            base.Dispose(disposing);
-
-            if (disposing)
-            {
-                File.Delete(databasePath);
-                File.Delete($"{databasePath}-shm");
-                File.Delete($"{databasePath}-wal");
-            }
         }
     }
 }

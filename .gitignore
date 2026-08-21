@@ -6,6 +6,7 @@ dist/
 *.db
 *.db-shm
 *.db-wal
+.env
 .DS_Store
 .superpowers/
 .codex/

@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace SdkProductCrud.Api;
 
-public sealed class ProductsController(ProductDbContext db) : ODataController
+public sealed class ProductsController(CatalogDbContext db) : ODataController
 {
     [EnableQuery]
     public IQueryable<Product> Get() => db.Products.AsNoTracking();
