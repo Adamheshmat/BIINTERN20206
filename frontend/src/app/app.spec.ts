@@ -59,4 +59,25 @@ describe('App', () => {
       'Unable to save product. Please try again.',
     );
   });
+
+  it('searches by trimmed product name and restores all products when cleared', () => {
+    const fixture = TestBed.createComponent(App);
+    const client = TestBed.inject(PublicApiClient);
+    fixture.detectChanges();
+
+    const search = fixture.nativeElement.querySelector(
+      'input[aria-label="Search products"]',
+    ) as HTMLInputElement | null;
+    expect(search).not.toBeNull();
+
+    search!.value = "  Bob's Coffee  ";
+    search!.dispatchEvent(new Event('input'));
+    expect(client.get).toHaveBeenLastCalledWith(
+      "/Products?$filter=contains(Name,'Bob''s Coffee')&$skip=0&$top=10&$count=true",
+    );
+
+    search!.value = '';
+    search!.dispatchEvent(new Event('input'));
+    expect(client.get).toHaveBeenLastCalledWith('/Products?$skip=0&$top=10&$count=true');
+  });
 });

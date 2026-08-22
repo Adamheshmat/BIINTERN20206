@@ -21,7 +21,15 @@ import { ProductDataSource } from './product-data-source';
         [CanDelete]="true"
         [deleteConfirmMsg]="true"
         [navButtons]="navButtons"
-      ></BI-Nav>
+      >
+        <input
+          class="product-search"
+          type="search"
+          aria-label="Search products"
+          placeholder="Search products"
+          (input)="searchProducts($any($event.target).value)"
+        />
+      </BI-Nav>
 
       @if (dataSource.errorMessage()) {
         <p class="message" aria-live="polite">{{ dataSource.errorMessage() }}</p>
@@ -51,6 +59,12 @@ export class App implements OnInit {
   };
 
   ngOnInit(): void {
-    this.dataSource.read('$skip=0&$top=10&$count=true');
+    this.searchProducts('');
+  }
+
+  searchProducts(value: string): void {
+    const name = value.trim().replaceAll("'", "''");
+    const filter = name ? `$filter=contains(Name,'${name}')&` : '';
+    this.dataSource.read(`${filter}$skip=0&$top=10&$count=true`);
   }
 }

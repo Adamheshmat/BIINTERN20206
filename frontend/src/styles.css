@@ -26,6 +26,13 @@ h1 {
   font-size: 1.5rem;
 }
 
+.product-search {
+  border: 1px solid var(--border-color, #d6d6d6);
+  border-radius: 0.25rem;
+  min-width: 12rem;
+  padding: 0.4rem 0.6rem;
+}
+
 .message {
   min-height: 1.25rem;
   margin: 0 0 0.75rem;

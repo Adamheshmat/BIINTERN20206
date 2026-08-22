@@ -58,7 +58,7 @@ export class BIGridComponent {
 @Component({
   selector: 'BI-Nav',
   standalone: true,
-  template: '',
+  template: '<ng-content />',
 })
 export class BiNavComponent {
   @Input() BIGrid: unknown;
