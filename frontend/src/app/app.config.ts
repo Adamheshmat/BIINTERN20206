@@ -10,9 +10,11 @@ import {
 import { MessageService } from '@progress/kendo-angular-l10n';
 import { TranslateModule } from '@ngx-translate/core';
 import { BIModulesModule, CreateDialog } from 'bi-modules';
+import { NavInfo } from 'bi-interfaces';
 import { PublicApiClient, PublicSdkModule } from '@salesbuzz/public-sdk';
 import { provideRouter } from '@angular/router';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { of } from 'rxjs';
 
 import { AppMessageService } from './app-message.service';
 import { AngularPublicApiClient } from './public-api-client.service';
@@ -30,6 +32,12 @@ export function defaultLocaleFactory(): string {
   return 'en-US';
 }
 
+class AppNavInfo extends NavInfo {
+  override getBUDesc() {
+    return of('');
+  }
+}
+
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
@@ -40,6 +48,7 @@ export const appConfig: ApplicationConfig = {
     importProvidersFrom(TranslateModule.forRoot(), PublicSdkModule, BIModulesModule),
     { provide: LOCALE_ID, useFactory: defaultLocaleFactory },
     { provide: 'CreateDialog', useFactory: createDialogFactory },
+    { provide: NavInfo, useClass: AppNavInfo },
     { provide: PublicApiClient, useClass: AngularPublicApiClient },
     { provide: MessageService, useClass: AppMessageService },
     DecimalPipe,

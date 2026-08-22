@@ -55,8 +55,23 @@ export class BIGridComponent {
   }
 }
 
+@Component({
+  selector: 'BI-Nav',
+  standalone: true,
+  template: '',
+})
+export class BiNavComponent {
+  @Input() BIGrid: unknown;
+  @Input() DomID = '';
+  @Input() CanInsert = false;
+  @Input() CanUpdate = false;
+  @Input() CanDelete = false;
+  @Input() deleteConfirmMsg = false;
+  @Input() navButtons: unknown;
+}
+
 @NgModule({
-  imports: [BIGridComponent],
-  exports: [BIGridComponent],
+  imports: [BIGridComponent, BiNavComponent],
+  exports: [BIGridComponent, BiNavComponent],
 })
 export class BIModulesModule {}
