@@ -91,3 +91,6 @@ are reported as skipped; they never fall back to SQLite.
 
 The Product fields are Id, Name, Price, Stock Quantity, and Is Active. The toolbar
 provides Add, Edit, Save, Delete, and Cancel actions.
+
+The BI Grid is a licensed Kendo component. If it shows a license notice, ask the
+company BI team for its Kendo UI license file; the CRUD page still runs without it.
