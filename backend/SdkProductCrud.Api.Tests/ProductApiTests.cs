@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -48,16 +49,17 @@ public sealed class ProductApiTests
 
         using var factory = new ProductApiFactory(database.ConnectionString);
         using var client = factory.CreateClient();
+        await AuthorizeAsAdminAsync(client);
         var payload = await client.GetFromJsonAsync<JsonElement>("/Products?$count=true");
 
-        Assert.Equal(4, payload.GetProperty("@odata.count").GetInt32());
+        Assert.Equal(2, payload.GetProperty("@odata.count").GetInt32());
         var names = payload.GetProperty("value").EnumerateArray()
             .Select(product => product.GetProperty("Name").GetString())
             .ToArray();
         Assert.Equal(1, names.Count(name => name == "Coffee"));
         Assert.Equal(1, names.Count(name => name == "Tea"));
-        Assert.Equal(1, names.Count(name => name == "Juice"));
-        Assert.Equal(1, names.Count(name => name == "Water"));
+        Assert.DoesNotContain("Juice", names);
+        Assert.DoesNotContain("Water", names);
     }
 
     [SqlServerFact]
@@ -95,7 +97,7 @@ public sealed class ProductApiTests
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal(
-                ["Coffee", "Juice", "Tea", "Water"],
+                ["Coffee", "Tea"],
                 payload.GetProperty("value").EnumerateArray()
                     .Select(item => item.GetProperty("Name").GetString()!)
                     .ToArray());
@@ -107,6 +109,7 @@ public sealed class ProductApiTests
     {
         await WithSqlServerApiAsync(async client =>
         {
+            await AuthorizeAsViewerAsync(client);
             var response = await client.GetAsync(
                 "/Products?$filter=Price%20ge%204%20and%20Price%20lt%205&$orderby=Price");
 
@@ -188,8 +191,25 @@ public sealed class ProductApiTests
         await using var database = await SqlServerTestDatabase.CreateInitializedAsync();
         using var factory = new ProductApiFactory(database.ConnectionString);
         using var client = factory.CreateClient();
+        await AuthorizeAsAdminAsync(client);
         await test(client);
     }
+
+    private static async Task AuthorizeAsAdminAsync(HttpClient client) =>
+        Authorize(client, await LoginAsync(client, "admin", "Admin-Test-Password-123!"));
+
+    private static async Task AuthorizeAsViewerAsync(HttpClient client) =>
+        Authorize(client, await LoginAsync(client, "viewer", "Viewer-Test-Password-123!"));
+
+    private static async Task<string> LoginAsync(HttpClient client, string userName, string password)
+    {
+        var response = await client.PostAsJsonAsync("/Auth/Login", new { userName, password });
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<LoginResponse>())!.Token;
+    }
+
+    private static void Authorize(HttpClient client, string token) =>
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
     private static async Task<int> CreateProductAsync(HttpClient client)
     {
