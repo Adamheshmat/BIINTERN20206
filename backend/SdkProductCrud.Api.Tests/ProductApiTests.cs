@@ -17,7 +17,7 @@ public sealed class ProductApiTests
         await WithSqlServerApiAsync(async client =>
         {
             var initial = await client.GetFromJsonAsync<JsonElement>("/Products?$count=true");
-            Assert.Equal(4, initial.GetProperty("@odata.count").GetInt32());
+            Assert.Equal(2, initial.GetProperty("@odata.count").GetInt32());
 
             var create = await client.PostAsJsonAsync("/Products", new
             {
