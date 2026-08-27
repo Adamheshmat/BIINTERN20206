@@ -77,6 +77,26 @@ describe('authInterceptor', () => {
     request.flush(session);
   });
 
+  it('does not add authorization to an absolute external request', () => {
+    sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        { provide: PublicApiClient, useValue: client },
+      ],
+    });
+    http = TestBed.inject(HttpClient);
+    httpTesting = TestBed.inject(HttpTestingController);
+
+    http.get('https://example.com/status').subscribe();
+
+    const request = httpTesting.expectOne('https://example.com/status');
+    expect(request.request.headers.has('Authorization')).toBe(false);
+    request.flush({ ok: true });
+  });
+
   it('leaves requests unchanged without a session', () => {
     http.get('/Products').subscribe();
 
@@ -133,6 +153,29 @@ describe('authInterceptor', () => {
     request.flush({ message: 'Unauthorized' }, { status: 401, statusText: 'Unauthorized' });
 
     expect(received).toHaveProperty('status', 401);
+    expect(auth.session()).toEqual(session);
+    expect(sessionStorage.getItem(AUTH_SESSION_KEY)).toBe(JSON.stringify(session));
+  });
+
+  it('preserves the session after an unauthorized external request', () => {
+    sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        { provide: PublicApiClient, useValue: client },
+      ],
+    });
+    http = TestBed.inject(HttpClient);
+    httpTesting = TestBed.inject(HttpTestingController);
+    auth = TestBed.inject(AuthService);
+
+    http.get('https://example.com/status').subscribe({ error: () => undefined });
+
+    const request = httpTesting.expectOne('https://example.com/status');
+    request.flush({ message: 'Unauthorized' }, { status: 401, statusText: 'Unauthorized' });
+
     expect(auth.session()).toEqual(session);
     expect(sessionStorage.getItem(AUTH_SESSION_KEY)).toBe(JSON.stringify(session));
   });

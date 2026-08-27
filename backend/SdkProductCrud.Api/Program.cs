@@ -20,6 +20,7 @@ IEdmModel edmModel = modelBuilder.GetEdmModel();
 builder.Services.AddSalesBuzzOData(edmModel);
 builder.Services.AddSalesBuzzExceptionHandling();
 builder.Services.AddSalesBuzzJwt(builder.Configuration);
+builder.Services.RequireConfiguredJwtIssuerAndAudience(builder.Configuration);
 builder.Services.AddAuthorization();
 builder.Services.AddSalesBuzzCurrentBU();
 builder.Services.AddCatalogData(builder.Configuration);

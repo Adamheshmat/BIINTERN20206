@@ -6,15 +6,15 @@ import { AuthService } from './auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const auth = inject(AuthService);
-  const isLoginRequest = request.url === '/Auth/Login';
+  const isProtectedApiRequest = /^\/Products(?:$|[?(])/.test(request.url);
   const token = auth.token();
-  const authorizedRequest = !isLoginRequest && token
+  const authorizedRequest = isProtectedApiRequest && token
     ? request.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
     : request;
 
   return next(authorizedRequest).pipe(
     catchError((error: unknown) => {
-      if (!isLoginRequest && error instanceof HttpErrorResponse && error.status === 401) {
+      if (isProtectedApiRequest && error instanceof HttpErrorResponse && error.status === 401) {
         auth.logout();
       }
 

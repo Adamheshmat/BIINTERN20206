@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using SalesBuzz.Shared.Authorization;
 using SalesBuzz.Shared.Data;
 using SdkProductCrud.Api;
@@ -36,6 +38,19 @@ public sealed class CatalogConfigurationTests
         Assert.IsType<CurrentBUContext>(currentBusinessUnit);
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<IPermissions>());
         Assert.NotNull(provider.GetRequiredService<IAuthenticationSchemeProvider>());
+    }
+
+    [Fact]
+    public void Jwt_registration_validates_the_configured_issuer_and_audience()
+    {
+        using var provider = BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
+            .Get(JwtBearerDefaults.AuthenticationScheme);
+
+        Assert.True(options.TokenValidationParameters.ValidateIssuer);
+        Assert.Equal("SdkProductCrud.Tests", options.TokenValidationParameters.ValidIssuer);
+        Assert.True(options.TokenValidationParameters.ValidateAudience);
+        Assert.Equal("SdkProductCrud.Frontend.Tests", options.TokenValidationParameters.ValidAudience);
     }
 
     [Theory]
@@ -100,6 +115,7 @@ public sealed class CatalogConfigurationTests
         services.AddRouting();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddSalesBuzzJwt(configuration);
+        services.RequireConfiguredJwtIssuerAndAudience(configuration);
         services.AddAuthorization();
         services.AddSalesBuzzCurrentBU();
         services.AddCatalogData(configuration);
