@@ -44,3 +44,65 @@ h1 {
     padding: 1rem;
   }
 }
+
+.login-card {
+  box-sizing: border-box;
+  max-width: 26rem;
+  margin: 10vh auto 0;
+  padding: 2rem;
+  border: 1px solid var(--border-color, #d6d6d6);
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 8%);
+}
+
+.login-card form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.login-card label {
+  font-weight: 600;
+}
+
+.login-card input,
+.login-card button,
+.session-bar button {
+  min-height: 2.5rem;
+  border: 1px solid var(--border-color, #767676);
+  border-radius: 0.35rem;
+  padding: 0.5rem 0.7rem;
+  font: inherit;
+}
+
+.login-card button,
+.session-bar button {
+  cursor: pointer;
+}
+
+.login-card input:focus-visible,
+.login-card button:focus-visible,
+.session-bar button:focus-visible {
+  outline: 3px solid #0b57d0;
+  outline-offset: 2px;
+}
+
+.login-error {
+  margin: 1rem 0 0;
+  color: #b3261e;
+}
+
+.session-bar,
+.session-bar div {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.session-bar {
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color, #d6d6d6);
+}
