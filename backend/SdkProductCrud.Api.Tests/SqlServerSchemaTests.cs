@@ -70,6 +70,7 @@ public sealed class SqlServerSchemaTests
         Assert.Equal(1, reader.GetInt32(12));
         Assert.Equal(2, reader.GetInt32(13));
         Assert.Equal(2, reader.GetInt32(14));
+        await reader.DisposeAsync();
 
         await using var secretCommand = connection.CreateCommand();
         secretCommand.CommandText = "SELECT COUNT(*) FROM dbo.AppCredentials";

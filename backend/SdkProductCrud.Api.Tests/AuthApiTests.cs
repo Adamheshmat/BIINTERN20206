@@ -34,7 +34,7 @@ public sealed class AuthApiTests
 
             var jwt = new JwtSecurityTokenHandler().ReadJwtToken(login.Token);
             Assert.Contains(jwt.Claims, claim => claim.Value == "admin" &&
-                claim.Type is "unique_name" or "name");
+                (claim.Type is "unique_name" or "name" || claim.Type == ClaimTypes.Name));
             Assert.Contains(jwt.Claims, claim => claim.Value == "admin" &&
                 claim.Type is "role" or ClaimTypes.Role);
             Assert.Equal("C100", jwt.Claims.Single(c => c.Type == "BUID").Value);

@@ -22,6 +22,7 @@ builder.Services.AddSalesBuzzExceptionHandling();
 builder.Services.AddSalesBuzzJwt(builder.Configuration);
 builder.Services.RequireConfiguredJwtIssuerAndAudience(builder.Configuration);
 builder.Services.AddAuthorization();
+builder.Services.AddMemoryCache();
 builder.Services.AddSalesBuzzCurrentBU();
 builder.Services.AddCatalogData(builder.Configuration);
 builder.Services.AddSingleton(demoCredentialOptions);
@@ -34,6 +35,7 @@ var app = builder.Build();
 
 app.UseSalesBuzzExceptionHandling();
 app.UseCors("LocalAngular");
+app.UseRequestLocalization("en-EG");
 app.UseStaticHttpContext();
 app.UseAuthentication();
 app.UseAuthorization();
