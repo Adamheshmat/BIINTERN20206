@@ -13,7 +13,7 @@ public sealed class AuthApiTests
     [SqlServerFact]
     public async Task Login_returns_a_short_lived_SDK_JWT_and_admin_permissions()
     {
-        await WithSqlServerApiAsync(async (_, client) =>
+        await WithSqlServerApiAsync(async (_database, client) =>
         {
             var response = await client.PostAsJsonAsync("/Auth/Login", new
             {
@@ -22,7 +22,14 @@ public sealed class AuthApiTests
             });
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-            var login = await response.Content.ReadFromJsonAsync<LoginResponse>();
+            var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.True(payload.TryGetProperty("token", out _));
+            Assert.True(payload.TryGetProperty("expiresAt", out _));
+            Assert.True(payload.GetProperty("user").TryGetProperty("userName", out _));
+            Assert.True(payload.GetProperty("user").TryGetProperty("buid", out _));
+            Assert.True(payload.GetProperty("permissions").TryGetProperty("canRead", out _));
+
+            var login = payload.Deserialize<LoginResponse>(JsonSerializerOptions.Web);
             Assert.NotNull(login);
             Assert.Equal("admin", login.User.UserName);
             Assert.Equal("admin", login.User.Role);
