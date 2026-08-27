@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
 using SalesBuzz.Shared.Middleware;
@@ -21,20 +20,6 @@ var app = builder.Build();
 
 app.UseSalesBuzzExceptionHandling();
 app.UseCors("LocalAngular");
-
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
-
-    if (!await db.Products.AnyAsync())
-    {
-        db.Products.AddRange(
-            new Product { Name = "Coffee", Price = 5.50m, StockQuantity = 24, IsActive = true },
-            new Product { Name = "Tea", Price = 3.25m, StockQuantity = 36, IsActive = true },
-            new Product { Name = "Juice", Price = 4.75m, StockQuantity = 18, IsActive = true });
-        await db.SaveChangesAsync();
-    }
-}
 
 app.MapControllers();
 

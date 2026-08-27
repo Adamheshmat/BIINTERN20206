@@ -47,6 +47,15 @@ public sealed class CatalogConfigurationTests
         Assert.Equal("dbo", product.GetSchema());
         Assert.Equal("decimal(18,2)", product.FindProperty(nameof(Product.Price))?.GetColumnType());
         Assert.Equal(100, product.FindProperty(nameof(Product.Name))?.GetMaxLength());
+        Assert.Equal(15, product.FindProperty(nameof(Product.BUID))?.GetMaxLength());
+        Assert.False(product.FindProperty(nameof(Product.BUID))?.IsNullable);
+
+        var credential = context.Model.FindEntityType(typeof(AppCredential));
+        Assert.NotNull(credential);
+        Assert.Equal("AppCredentials", credential.GetTableName());
+        Assert.Equal("dbo", credential.GetSchema());
+        Assert.Equal(nameof(AppCredential.UserName), credential.FindPrimaryKey()!.Properties.Single().Name);
+        Assert.Equal(500, credential.FindProperty(nameof(AppCredential.PasswordHash))?.GetMaxLength());
     }
 
     private static ServiceProvider BuildServiceProvider()

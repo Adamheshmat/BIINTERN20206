@@ -822,10 +822,32 @@ BEGIN
         [Price]                     DECIMAL(18,2)   NOT NULL,
         [StockQuantity]             INT             NOT NULL,
         [IsActive]                  BIT             NOT NULL DEFAULT 1,
+        [BUID]                      NVARCHAR(15)    NOT NULL,
 
         CONSTRAINT [PK_Products] PRIMARY KEY CLUSTERED ([Id]),
         CONSTRAINT [CK_Products_Price] CHECK ([Price] >= 0),
         CONSTRAINT [CK_Products_StockQuantity] CHECK ([StockQuantity] >= 0)
+    );
+END
+GO
+
+IF COL_LENGTH(N'dbo.Products', N'BUID') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[Products] ADD [BUID] NVARCHAR(15) NULL;
+    UPDATE [dbo].[Products] SET [BUID] = N'C100' WHERE [BUID] IS NULL;
+    ALTER TABLE [dbo].[Products] ALTER COLUMN [BUID] NVARCHAR(15) NOT NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'AppCredentials' AND schema_id = SCHEMA_ID('dbo'))
+BEGIN
+    CREATE TABLE [dbo].[AppCredentials]
+    (
+        [UserName] NVARCHAR(15) NOT NULL,
+        [PasswordHash] NVARCHAR(500) NOT NULL,
+        CONSTRAINT [PK_AppCredentials] PRIMARY KEY CLUSTERED ([UserName]),
+        CONSTRAINT [FK_AppCredentials_loginusers] FOREIGN KEY ([UserName])
+            REFERENCES [dbo].[loginusers]([userName]) ON DELETE CASCADE
     );
 END
 GO
@@ -866,6 +888,12 @@ BEGIN
 END
 GO
 
+IF NOT EXISTS (SELECT 1 FROM dbo.HH_SA_BU WHERE BUID = N'C200')
+    INSERT INTO dbo.HH_SA_BU
+        (BUID, Description, DescriptionA, Level, ShortCode, CreatedOn, Createdby)
+    VALUES (N'C200', N'Viewer Business Unit', N'وحدة أعمال المشاهد', 0, N'C200', GETDATE(), N'system');
+GO
+
 -- Roles
 IF NOT EXISTS (SELECT 1 FROM [dbo].[HH_SA_Roles] WHERE [RoleID] = 'user')
 BEGIN
@@ -881,34 +909,49 @@ BEGIN
 END
 GO
 
--- Login Users
-IF NOT EXISTS (SELECT 1 FROM [dbo].[loginusers] WHERE [userName] = 'demo')
-BEGIN
-    INSERT INTO [dbo].[loginusers] ([userName], [RoleID], [BUID], [InActive], [FullName], [CreatedOn], [Createdby])
-    VALUES ('demo', 'user', 'C100', 0, 'Demo User', GETDATE(), 'system');
-END
+IF NOT EXISTS (SELECT 1 FROM dbo.HH_SA_Roles WHERE RoleID = N'viewer')
+    INSERT INTO dbo.HH_SA_Roles
+        (RoleID, Description, DescriptionA, NeedExplicitUpdatePermission, CreatedOn, Createdby)
+    VALUES (N'viewer', N'Viewer', N'مشاهد', 1, GETDATE(), N'system');
 GO
 
-IF NOT EXISTS (SELECT 1 FROM [dbo].[loginusers] WHERE [userName] = 'admin')
-BEGIN
-    INSERT INTO [dbo].[loginusers] ([userName], [RoleID], [BUID], [InActive], [FullName], [CreatedOn], [Createdby])
-    VALUES ('admin', 'admin', 'C100', 0, 'Administrator', GETDATE(), 'system');
-END
+-- Login Users
+IF NOT EXISTS (SELECT 1 FROM dbo.loginusers WHERE userName = N'admin')
+    INSERT INTO dbo.loginusers
+        (userName, RoleID, BUID, InActive, FullName, CreatedOn, Createdby)
+    VALUES (N'admin', N'admin', N'C100', 0, N'Administrator', GETDATE(), N'system');
+ELSE
+    UPDATE dbo.loginusers SET RoleID = N'admin', BUID = N'C100', InActive = 0
+    WHERE userName = N'admin';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.loginusers WHERE userName = N'viewer')
+    INSERT INTO dbo.loginusers
+        (userName, RoleID, BUID, InActive, FullName, CreatedOn, Createdby)
+    VALUES (N'viewer', N'viewer', N'C200', 0, N'Viewer', GETDATE(), N'system');
+ELSE
+    UPDATE dbo.loginusers SET RoleID = N'viewer', BUID = N'C200', InActive = 0
+    WHERE userName = N'viewer';
 GO
 
 -- User BU Permissions
-IF NOT EXISTS (SELECT 1 FROM [dbo].[HH_SA_UserBUPermissions] WHERE [UserID] = 'demo' AND [BUID] = 'C100')
-BEGIN
-    INSERT INTO [dbo].[HH_SA_UserBUPermissions] ([UserID], [BUID], [CreatedOn], [Createdby])
-    VALUES ('demo', 'C100', GETDATE(), 'system');
-END
+DELETE FROM dbo.HH_SA_UserBUPermissions
+WHERE UserID = N'demo'
+  AND EXISTS (SELECT 1 FROM dbo.loginusers
+              WHERE userName = N'demo' AND Createdby = N'system');
+DELETE FROM dbo.loginusers WHERE userName = N'demo' AND Createdby = N'system';
 GO
 
-IF NOT EXISTS (SELECT 1 FROM [dbo].[HH_SA_UserBUPermissions] WHERE [UserID] = 'admin' AND [BUID] = 'C100')
-BEGIN
-    INSERT INTO [dbo].[HH_SA_UserBUPermissions] ([UserID], [BUID], [CreatedOn], [Createdby])
-    VALUES ('admin', 'C100', GETDATE(), 'system');
-END
+IF NOT EXISTS (SELECT 1 FROM dbo.HH_SA_UserBUPermissions
+               WHERE UserID = N'admin' AND BUID = N'C100')
+    INSERT INTO dbo.HH_SA_UserBUPermissions (UserID, BUID, CreatedOn, Createdby)
+    VALUES (N'admin', N'C100', GETDATE(), N'system');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.HH_SA_UserBUPermissions
+               WHERE UserID = N'viewer' AND BUID = N'C200')
+    INSERT INTO dbo.HH_SA_UserBUPermissions (UserID, BUID, CreatedOn, Createdby)
+    VALUES (N'viewer', N'C200', GETDATE(), N'system');
 GO
 
 -- Role Permissions (returnreasons CRUD for both roles)
@@ -926,6 +969,46 @@ BEGIN
 END
 GO
 
+IF NOT EXISTS (SELECT 1 FROM dbo.HH_SA_SecurityKeys WHERE KeyID = N'Products')
+    INSERT INTO dbo.HH_SA_SecurityKeys
+        (KeyID, Description, DescriptionA, Type, ModuleID, ModuleDesc, CreatedOn, Createdby)
+    VALUES (N'Products', N'Products', N'المنتجات', 0, N'Catalog', N'Catalog', GETDATE(), N'system');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.HH_SA_RolePermissions WHERE RoleID = N'admin' AND KeyID = N'Products')
+    INSERT INTO dbo.HH_SA_RolePermissions
+        (RoleID, KeyID, CanRead, CanInsert, CanUpdate, CanDelete, CanExecute, CreatedOn, Createdby)
+    VALUES (N'admin', N'Products', 1, 1, 1, 1, 0, GETDATE(), N'system');
+ELSE
+    UPDATE dbo.HH_SA_RolePermissions
+    SET CanRead = 1, CanInsert = 1, CanUpdate = 1, CanDelete = 1, CanExecute = 0
+    WHERE RoleID = N'admin' AND KeyID = N'Products';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.HH_SA_RolePermissions WHERE RoleID = N'viewer' AND KeyID = N'Products')
+    INSERT INTO dbo.HH_SA_RolePermissions
+        (RoleID, KeyID, CanRead, CanInsert, CanUpdate, CanDelete, CanExecute, CreatedOn, Createdby)
+    VALUES (N'viewer', N'Products', 1, 0, 0, 0, 0, GETDATE(), N'system');
+ELSE
+    UPDATE dbo.HH_SA_RolePermissions
+    SET CanRead = 1, CanInsert = 0, CanUpdate = 0, CanDelete = 0, CanExecute = 0
+    WHERE RoleID = N'viewer' AND KeyID = N'Products';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.Products WHERE Name = N'Coffee' AND BUID = N'C100')
+    INSERT INTO dbo.Products (Name, Price, StockQuantity, IsActive, BUID)
+    VALUES (N'Coffee', 5.50, 24, 1, N'C100');
+IF NOT EXISTS (SELECT 1 FROM dbo.Products WHERE Name = N'Tea' AND BUID = N'C100')
+    INSERT INTO dbo.Products (Name, Price, StockQuantity, IsActive, BUID)
+    VALUES (N'Tea', 3.25, 36, 1, N'C100');
+IF NOT EXISTS (SELECT 1 FROM dbo.Products WHERE Name = N'Juice' AND BUID = N'C200')
+    INSERT INTO dbo.Products (Name, Price, StockQuantity, IsActive, BUID)
+    VALUES (N'Juice', 4.75, 18, 1, N'C200');
+IF NOT EXISTS (SELECT 1 FROM dbo.Products WHERE Name = N'Water' AND BUID = N'C200')
+    INSERT INTO dbo.Products (Name, Price, StockQuantity, IsActive, BUID)
+    VALUES (N'Water', 1.50, 48, 1, N'C200');
+GO
+
 -- Entity BU Control
 IF NOT EXISTS (SELECT 1 FROM [dbo].[HH_EntityBUControl] WHERE [TableName] = 'ReturnReasons')
 BEGIN
@@ -941,6 +1024,6 @@ PRINT '==========================================';
 PRINT 'SalesBuzz SDK schema initialized successfully.';
 PRINT 'Tables created:  32';
 PRINT 'Stored Procedure: 1 (Get_AuditCriteria)';
-PRINT 'Seed data: BU=C100, Users=demo/admin, Roles=user/admin';
+PRINT 'Seed data: BUs=C100/C200, Users=admin/viewer, Roles=user/admin/viewer';
 PRINT '==========================================';
 GO

@@ -16,7 +16,7 @@ public sealed class ProductApiTests
         await WithSqlServerApiAsync(async client =>
         {
             var initial = await client.GetFromJsonAsync<JsonElement>("/Products?$count=true");
-            Assert.Equal(3, initial.GetProperty("@odata.count").GetInt32());
+            Assert.Equal(4, initial.GetProperty("@odata.count").GetInt32());
 
             var create = await client.PostAsJsonAsync("/Products", new
             {
@@ -42,27 +42,22 @@ public sealed class ProductApiTests
     }
 
     [SqlServerFact]
-    public async Task Startup_does_not_add_sample_products_when_the_table_is_not_empty()
+    public async Task Startup_does_not_mutate_schema_seeded_products()
     {
         await using var database = await SqlServerTestDatabase.CreateInitializedAsync();
-        await using (var connection = await database.OpenConnectionAsync())
-        await using (var command = connection.CreateCommand())
-        {
-            command.CommandText = """
-                INSERT INTO dbo.Products (Name, Price, StockQuantity, IsActive)
-                VALUES (N'Existing product', 9.99, 7, 1);
-                """;
-            await command.ExecuteNonQueryAsync();
-        }
 
         using var factory = new ProductApiFactory(database.ConnectionString);
         using var client = factory.CreateClient();
         var payload = await client.GetFromJsonAsync<JsonElement>("/Products?$count=true");
 
-        Assert.Equal(1, payload.GetProperty("@odata.count").GetInt32());
-        Assert.Equal(
-            "Existing product",
-            payload.GetProperty("value")[0].GetProperty("Name").GetString());
+        Assert.Equal(4, payload.GetProperty("@odata.count").GetInt32());
+        var names = payload.GetProperty("value").EnumerateArray()
+            .Select(product => product.GetProperty("Name").GetString())
+            .ToArray();
+        Assert.Equal(1, names.Count(name => name == "Coffee"));
+        Assert.Equal(1, names.Count(name => name == "Tea"));
+        Assert.Equal(1, names.Count(name => name == "Juice"));
+        Assert.Equal(1, names.Count(name => name == "Water"));
     }
 
     [SqlServerFact]
@@ -100,7 +95,7 @@ public sealed class ProductApiTests
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal(
-                ["Coffee", "Juice", "Tea"],
+                ["Coffee", "Juice", "Tea", "Water"],
                 payload.GetProperty("value").EnumerateArray()
                     .Select(item => item.GetProperty("Name").GetString()!)
                     .ToArray());
