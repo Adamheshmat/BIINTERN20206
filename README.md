@@ -19,14 +19,17 @@ The optional local workflow uses SQL Server 2022 Developer in Docker, persists i
 data in the named volume `sdk-product-crud-sqlserver-data`, and applies
 `backend/database/SDK_Minimal_Schema.sql` idempotently.
 
-1. Create the ignored local environment file and set a strong password:
+1. Create the ignored local environment file and set its local-only values:
 
    ```sh
    cp .env.example .env
    ```
 
-   `.env` is loaded as shell syntax, so wrap passwords containing shell-special
-   characters in single quotes.
+   Set `MSSQL_SA_PASSWORD`, a random `JWT__Key` of at least 32 bytes, and two
+   different, non-shared values for `DemoCredentials__AdminPassword` and
+   `DemoCredentials__ViewerPassword`. `.env` is loaded as shell syntax, so wrap
+   passwords containing shell-special characters in single quotes. Keep this
+   ignored file local; never commit its values.
 
 2. Review the SQL Server container license terms. Running the next command sets
    `ACCEPT_EULA=Y`, so run it only if you accept those terms:
@@ -59,6 +62,14 @@ export ConnectionStrings__DefaultConnection='Server=company-host;Database=SdkPro
 
 ## Run the app
 
+After any schema changes, apply the schema before starting the app:
+
+```sh
+./scripts/setup-sqlserver.sh
+```
+
+Then run:
+
 ```sh
 ./run-local.sh
 ```
@@ -66,12 +77,35 @@ export ConnectionStrings__DefaultConnection='Server=company-host;Database=SdkPro
 The script starts the Angular app at <http://localhost:4200> and its API at
 <http://localhost:5201>. When the explicit company connection is not set, it
 generates `ConnectionStrings:DefaultConnection` from the same
-`MSSQL_SA_PASSWORD`, host, and port used by the local container. Press Control+C
-to stop both app processes; SQL Server remains available separately.
+`MSSQL_SA_PASSWORD`, host, and port used by the local container. It always loads
+an optional local `.env`, even when `ConnectionStrings__DefaultConnection` is
+provided externally. Press Control+C to stop both app processes; SQL Server remains
+available separately.
 
-Authentication remains disabled for this sample. The API uses the BI-SDK SQL
-Server context, shared OData registration, and shared exception middleware without
-JWT registration, token-validation middleware, authorization attributes, or login UI.
+The app starts at a login form. Sign in as `admin` to demonstrate full CRUD for
+business unit `C100`, or as `viewer` to demonstrate read-only data for `C200`.
+The configured passwords are hashed into `AppCredentials` at startup: plaintext
+passwords are never stored in SQL, and changing a local demo password updates its
+stored hash the next time the app starts. Tokens live only in browser
+`sessionStorage`, expire after 15 minutes, and logout clears them.
+
+The UI’s button visibility is only a convenience. Backend `[HasPermission]`
+authorization and business-unit filters enforce the same security for direct API
+requests. Startup intentionally stops with the missing setting’s key named if any
+JWT or demo-password setting is missing.
+
+## Manual demo verification
+
+With a SQL Server available, apply the schema, start the app, and verify the
+following presentation flow:
+
+1. With no browser session, only the login form is visible.
+2. Incorrect credentials show the generic login error.
+3. `admin` shows the `C100` identity and `C100` Products with full toolbar CRUD.
+4. `viewer` shows the `C200` identity and `C200` Products with a read-only toolbar.
+5. A direct Viewer `POST`, `PATCH`, or `DELETE` receives the SDK permission rejection.
+6. An Admin request for a `C200` Product key receives `404`.
+7. Logout returns to login and removes `sdk-product-crud.auth` from session storage.
 
 ## Backend tests
 
@@ -88,6 +122,25 @@ dotnet test backend/SdkProductCrud.Api.Tests/SdkProductCrud.Api.Tests.csproj --n
 
 When `SQLSERVER_TEST_MASTER_CONNECTION` is absent, only the real SQL Server tests
 are reported as skipped; they never fall back to SQLite.
+
+Run the complete backend verification suite with the real SQL Server command above
+when a master connection is available:
+
+```sh
+dotnet restore backend/SdkProductCrud.Api.Tests/SdkProductCrud.Api.Tests.csproj \
+  --configfile backend/NuGet.config
+dotnet test backend/SdkProductCrud.Api.Tests/SdkProductCrud.Api.Tests.csproj --no-restore
+dotnet build backend/SdkProductCrud.Api/SdkProductCrud.Api.csproj --no-restore
+```
+
+Run the complete frontend verification suite from `frontend`:
+
+```sh
+npm test
+npm run test:bi-package-patch
+npm run test:real-grid
+npm run build
+```
 
 The Product fields are Id, Name, Price, Stock Quantity, and Is Active. The toolbar
 provides Add, Edit, Save, Delete, and Cancel actions.
