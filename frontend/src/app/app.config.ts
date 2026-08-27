@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
   ApplicationConfig,
   importProvidersFrom,
@@ -17,6 +17,7 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 import { of } from 'rxjs';
 
 import { AppMessageService } from './app-message.service';
+import { authInterceptor } from './auth.interceptor';
 import { AngularPublicApiClient } from './public-api-client.service';
 
 export function createDialogFactory(): () => CreateDialog {
@@ -43,7 +44,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideAnimationsAsync(),
-    provideHttpClient(),
+    provideHttpClient(withInterceptors([authInterceptor])),
     provideRouter([]),
     importProvidersFrom(TranslateModule.forRoot(), PublicSdkModule, BIModulesModule),
     { provide: LOCALE_ID, useFactory: defaultLocaleFactory },
