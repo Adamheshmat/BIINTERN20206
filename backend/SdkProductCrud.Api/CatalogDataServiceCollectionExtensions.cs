@@ -8,8 +8,6 @@ public static class CatalogDataServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddHttpContextAccessor();
-        services.AddScoped<ICurrentBUContext, CurrentBUContext>();
         services.AddSalesBuzzDb<SdkProductCrud.Api.CatalogDbContext>(configuration);
 
         return services;

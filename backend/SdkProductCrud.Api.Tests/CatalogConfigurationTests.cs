@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SalesBuzz.Shared.Authorization;
 using SalesBuzz.Shared.Data;
 using SdkProductCrud.Api;
 using Xunit;
@@ -32,6 +34,27 @@ public sealed class CatalogConfigurationTests
         Assert.Equal("Microsoft.EntityFrameworkCore.SqlServer", catalog.Database.ProviderName);
         Assert.Equal("SdkProductCrud", catalog.Database.GetDbConnection().Database);
         Assert.IsType<CurrentBUContext>(currentBusinessUnit);
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<IPermissions>());
+        Assert.NotNull(provider.GetRequiredService<IAuthenticationSchemeProvider>());
+    }
+
+    [Theory]
+    [InlineData("DemoCredentials:AdminPassword")]
+    [InlineData("DemoCredentials:ViewerPassword")]
+    public void Demo_credentials_name_the_missing_configuration_key(string missingKey)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["DemoCredentials:AdminPassword"] = "admin-secret",
+            ["DemoCredentials:ViewerPassword"] = "viewer-secret"
+        };
+        values[missingKey] = null;
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+
+        var error = Assert.Throws<InvalidOperationException>(
+            () => DemoCredentialOptions.FromConfiguration(configuration));
+
+        Assert.Contains(missingKey, error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -63,11 +86,22 @@ public sealed class CatalogConfigurationTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:DefaultConnection"] = DefaultConnection
+                ["ConnectionStrings:DefaultConnection"] = DefaultConnection,
+                ["JWT:Key"] = "configuration-test-signing-key-at-least-32-characters",
+                ["JWT:ValidIssuer"] = "SdkProductCrud.Tests",
+                ["JWT:ValidAudience"] = "SdkProductCrud.Frontend.Tests",
+                ["DemoCredentials:AdminPassword"] = "admin-secret",
+                ["DemoCredentials:ViewerPassword"] = "viewer-secret"
             })
             .Build();
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddMemoryCache();
+        services.AddRouting();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddSalesBuzzJwt(configuration);
+        services.AddAuthorization();
+        services.AddSalesBuzzCurrentBU();
         services.AddCatalogData(configuration);
 
         return services.BuildServiceProvider(new ServiceProviderOptions

@@ -205,19 +205,4 @@ public sealed class ProductApiTests
         return product.GetProperty("Id").GetInt32();
     }
 
-    private sealed class ProductApiFactory : WebApplicationFactory<Program>
-    {
-        private readonly string connectionString;
-
-        internal ProductApiFactory(string connectionString)
-        {
-            this.connectionString = connectionString;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseEnvironment("Testing");
-            builder.UseSetting("ConnectionStrings:DefaultConnection", connectionString);
-        }
-    }
 }
