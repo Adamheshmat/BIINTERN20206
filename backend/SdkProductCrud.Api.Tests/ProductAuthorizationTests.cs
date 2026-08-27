@@ -67,6 +67,37 @@ public sealed class ProductAuthorizationTests
     }
 
     [SqlServerFact]
+    public async Task Product_summary_is_scoped_to_the_current_business_unit()
+    {
+        await WithSqlServerApiAsync(async (database, client) =>
+        {
+            await using (var connection = await database.OpenConnectionAsync())
+            await using (var command = connection.CreateCommand())
+            {
+                command.CommandText = """
+                    INSERT INTO dbo.Products (Name, Price, StockQuantity, IsActive, BUID)
+                    VALUES (N'Low stock sample', 2.00, 5, 0, N'C100');
+                    """;
+                await command.ExecuteNonQueryAsync();
+            }
+
+            Authorize(client, await LoginAsync(client, "admin", "Admin-Test-Password-123!"));
+            var admin = await client.GetFromJsonAsync<JsonElement>("/ProductSummary");
+            Assert.Equal(3, admin.GetProperty("productCount").GetInt32());
+            Assert.Equal(259m, admin.GetProperty("totalInventoryValue").GetDecimal());
+            Assert.Equal(2, admin.GetProperty("activeProductCount").GetInt32());
+            Assert.Equal(1, admin.GetProperty("lowStockProductCount").GetInt32());
+
+            Authorize(client, await LoginAsync(client, "viewer", "Viewer-Test-Password-123!"));
+            var viewer = await client.GetFromJsonAsync<JsonElement>("/ProductSummary");
+            Assert.Equal(2, viewer.GetProperty("productCount").GetInt32());
+            Assert.Equal(157.5m, viewer.GetProperty("totalInventoryValue").GetDecimal());
+            Assert.Equal(2, viewer.GetProperty("activeProductCount").GetInt32());
+            Assert.Equal(0, viewer.GetProperty("lowStockProductCount").GetInt32());
+        });
+    }
+
+    [SqlServerFact]
     public async Task Admin_post_uses_the_current_business_unit_instead_of_the_payload()
     {
         await WithSqlServerApiAsync(async (database, client) =>

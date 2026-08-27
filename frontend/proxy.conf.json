@@ -3,6 +3,10 @@
     "target": "http://localhost:5201",
     "secure": false
   },
+  "/ProductSummary": {
+    "target": "http://localhost:5201",
+    "secure": false
+  },
   "/Auth": {
     "target": "http://localhost:5201",
     "secure": false

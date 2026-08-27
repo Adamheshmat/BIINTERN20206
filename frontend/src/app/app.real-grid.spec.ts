@@ -41,7 +41,14 @@ describe('App with the shipped BI Grid package', () => {
   async function createFixture(session: AuthSession) {
     sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
     const client = {
-      get: vi.fn(() => of({ value: [], '@odata.count': 0 })),
+      get: vi.fn((url: string) => of(url === '/ProductSummary'
+        ? {
+            productCount: 0,
+            totalInventoryValue: 0,
+            activeProductCount: 0,
+            lowStockProductCount: 0,
+          }
+        : { value: [], '@odata.count': 0 })),
       post: vi.fn(),
       patch: vi.fn(),
       delete: vi.fn(),
@@ -86,10 +93,17 @@ describe('App with the shipped BI Grid package', () => {
       'Delete_ProductsNav',
       'Cancel_ProductsNav',
     ]);
-    expect(headers).toEqual(['Id', 'Product Name', 'Price', 'Stock Quantity', 'Active']);
-    expect(client.get).toHaveBeenCalledExactlyOnceWith(
-      '/Products?$skip=0&$top=10&$count=true',
-    );
+    expect(headers).toEqual([
+      'Id',
+      'Product Name',
+      'Price (EGP)',
+      'Stock Quantity',
+      'Active',
+      'Status',
+    ]);
+    expect(client.get).toHaveBeenCalledTimes(2);
+    expect(client.get).toHaveBeenCalledWith('/Products?$skip=0&$top=10&$count=true');
+    expect(client.get).toHaveBeenCalledWith('/ProductSummary');
   });
 
   it('passes read-only mutation permissions to the shipped BI navigation for a Viewer', async () => {

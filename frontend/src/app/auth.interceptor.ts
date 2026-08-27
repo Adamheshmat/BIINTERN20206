@@ -6,7 +6,8 @@ import { AuthService } from './auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const auth = inject(AuthService);
-  const isProtectedApiRequest = /^\/Products(?:$|[?(])/.test(request.url);
+  const isProtectedApiRequest =
+    /^\/Products(?:$|[?(])/.test(request.url) || request.url === '/ProductSummary';
   const token = auth.token();
   const authorizedRequest = isProtectedApiRequest && token
     ? request.clone({ setHeaders: { Authorization: `Bearer ${token}` } })

@@ -69,6 +69,26 @@ describe('authInterceptor', () => {
     request.flush({ value: [] });
   });
 
+  it('adds the bearer token to the secured product summary request', () => {
+    sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        { provide: PublicApiClient, useValue: client },
+      ],
+    });
+    http = TestBed.inject(HttpClient);
+    httpTesting = TestBed.inject(HttpTestingController);
+
+    http.get('/ProductSummary').subscribe();
+
+    const request = httpTesting.expectOne('/ProductSummary');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer test-token');
+    request.flush({ productCount: 0 });
+  });
+
   it('does not add authorization to login requests', () => {
     http.post('/Auth/Login', { userName: 'admin', password: 'secret' }).subscribe();
 

@@ -4,4 +4,5 @@ export interface Product {
   Price: number;
   StockQuantity: number;
   IsActive: boolean;
+  Status?: 'Active' | 'Inactive';
 }

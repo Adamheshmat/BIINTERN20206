@@ -1,6 +1,6 @@
 import { DataTypes } from 'bi-interfaces';
 import type { PublicApiClient } from '@salesbuzz/public-sdk';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Product } from './product.model';
@@ -38,7 +38,7 @@ describe('ProductDataSource', () => {
     source.read('$skip=0&$top=10&$count=true');
 
     expect(client.get).toHaveBeenCalledWith('/Products?$skip=0&$top=10&$count=true');
-    expect(source.getValue()).toEqual({ data: [product], total: 1 });
+    expect(source.getValue()).toEqual({ data: [{ ...product, Status: 'Active' }], total: 1 });
   });
 
   it('posts a new product to the Products collection', () => {
@@ -48,6 +48,7 @@ describe('ProductDataSource', () => {
     source.add(product).subscribe((response) => expect(response).toEqual(product));
 
     expect(client.post).toHaveBeenCalledWith('/Products', product);
+    expect(source.notice()).toEqual({ kind: 'success', text: 'Product added successfully.' });
   });
 
   it('patches a product at its OData entity URL', () => {
@@ -58,6 +59,7 @@ describe('ProductDataSource', () => {
     source.patch(changes, 3).subscribe((response) => expect(response).toEqual(product));
 
     expect(client.patch).toHaveBeenCalledWith('/Products(3)', changes);
+    expect(source.notice()).toEqual({ kind: 'success', text: 'Product updated successfully.' });
   });
 
   it('deletes a product at its OData entity URL', () => {
@@ -67,6 +69,7 @@ describe('ProductDataSource', () => {
     source.delete(3).subscribe();
 
     expect(client.delete).toHaveBeenCalledWith('/Products(3)');
+    expect(source.notice()).toEqual({ kind: 'success', text: 'Product deleted successfully.' });
   });
 
   it('gets the supplied URL without changing it', () => {
@@ -74,9 +77,34 @@ describe('ProductDataSource', () => {
     const source = new ProductDataSource(client);
     const url = '/Products?$filter=Id eq 3';
 
-    source.get(url).subscribe((response) => expect(response).toEqual({ value: [product] }));
+    source.get(url).subscribe((response) => expect(response).toEqual({
+      value: [{ ...product, Status: 'Active' }],
+    }));
 
     expect(client.get).toHaveBeenCalledWith(url);
+  });
+
+  it('keeps successful write feedback through the BI Grid refresh request', () => {
+    const client = createClient();
+    const source = new ProductDataSource(client);
+
+    source.add(product).subscribe();
+    source.get('/Products?$filter=Id eq 3').subscribe();
+
+    expect(source.notice()).toEqual({ kind: 'success', text: 'Product added successfully.' });
+  });
+
+  it('decorates a refreshed inactive product with an up-to-date status', () => {
+    const client = createClient();
+    vi.mocked(client.get).mockReturnValueOnce(of({
+      ...product,
+      IsActive: false,
+    }));
+    const source = new ProductDataSource(client);
+
+    source.get<Product>('/Products(3)').subscribe((response) => {
+      expect(response.Status).toBe('Inactive');
+    });
   });
 
   it('reports a failed entity refresh while preserving the original error', () => {
@@ -90,9 +118,13 @@ describe('ProductDataSource', () => {
 
     expect(received).toBe(failure);
     expect(source.errorMessage()).toBe('Unable to load products. Please try again.');
+    expect(source.notice()).toEqual({
+      kind: 'error',
+      text: 'Unable to load products. Please try again.',
+    });
   });
 
-  it('defines the five BI Grid columns for the PascalCase product fields', () => {
+  it('defines the BI Grid columns and product visual indicators', () => {
     const source = new ProductDataSource(createClient());
 
     expect(source.Columns.map((column) => column.Name)).toEqual([
@@ -101,6 +133,7 @@ describe('ProductDataSource', () => {
       'Price',
       'StockQuantity',
       'IsActive',
+      'Status',
     ]);
     expect(source.Columns.map((column) => column.DataType)).toEqual([
       DataTypes.NUMERIC,
@@ -108,6 +141,7 @@ describe('ProductDataSource', () => {
       DataTypes.NUMERIC,
       DataTypes.NUMERIC,
       DataTypes.Boolean,
+      DataTypes.Text,
     ]);
     expect(source.Columns.map((column) => column.controlType)).toEqual([
       'numeric',
@@ -115,16 +149,25 @@ describe('ProductDataSource', () => {
       'numeric',
       'numeric',
       'boolean',
+      'text',
     ]);
     expect(source.Columns.map((column) => column.DisplayName)).toEqual([
       'Id',
       'Product Name',
-      'Price',
+      'Price (EGP)',
       'Stock Quantity',
       'Active',
+      'Status',
     ]);
     expect(source.Columns[0].IsEditable).toBe(false);
     expect(source.Columns[4].DefaultValue).toBe(true);
+    expect(source.excludeDataFromReq).toContain('Status');
+    expect(source.Columns[2].Precision).toBe(2);
+    expect(source.Columns[3].ConditionalCellStyleFn?.({ StockQuantity: 5 })).toMatchObject({
+      color: '#9a4b00',
+      fontWeight: '700',
+    });
+    expect(source.Columns[3].ConditionalCellStyleFn?.({ StockQuantity: 10 })).toEqual({});
 
     const nameValidators = source.Columns[1].Validators!;
     const priceValidators = source.Columns[2].Validators!;
@@ -148,7 +191,7 @@ describe('ProductDataSource', () => {
 
     source.read('$skip=0&$top=10&$count=true');
     expect(source.errorMessage()).toBe('');
-    expect(source.getValue()).toEqual({ data: [product], total: 1 });
+    expect(source.getValue()).toEqual({ data: [{ ...product, Status: 'Active' }], total: 1 });
   });
 
   it.each([
@@ -166,5 +209,23 @@ describe('ProductDataSource', () => {
 
     expect(received).toBe(failure);
     expect(source.errorMessage()).toBe('Unable to save product. Please try again.');
+    expect(source.notice()).toEqual({
+      kind: 'error',
+      text: 'Unable to save product. Please try again.',
+    });
+  });
+
+  it('announces loading while a product read is pending', () => {
+    const response = new Subject<{ value: Product[]; '@odata.count': number }>();
+    const client = createClient();
+    vi.mocked(client.get).mockReturnValueOnce(response.asObservable());
+    const source = new ProductDataSource(client);
+
+    source.read('$skip=0&$top=10&$count=true');
+    expect(source.isLoading()).toBe(true);
+
+    response.next({ value: [product], '@odata.count': 1 });
+    response.complete();
+    expect(source.isLoading()).toBe(false);
   });
 });
