@@ -54,11 +54,18 @@ Use the company SQL Server as the supported alternative. See
 [Microsoft's SQL Server container deployment guidance](https://learn.microsoft.com/en-us/sql/linux/containers/deploy?view=sql-server-ver17).
 
 For the company server, have the database/schema initialized by the appropriate
-database administrator and provide the connection directly instead of `.env`:
+database administrator and provide the connection directly rather than generating
+it from `.env`:
 
 ```sh
 export ConnectionStrings__DefaultConnection='Server=company-host;Database=SdkProductCrud;User Id=...;Password=...;Encrypt=True;TrustServerCertificate=False'
 ```
+
+Keep an ignored local `.env` for the authentication demo: its
+`JWT__Key`, `JWT__ValidIssuer`, `JWT__ValidAudience`,
+`DemoCredentials__AdminPassword`, and `DemoCredentials__ViewerPassword` settings
+must all be populated. The `MSSQL_*` values are not used when the explicit
+connection string is supplied.
 
 ## Run the app
 
